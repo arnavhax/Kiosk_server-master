@@ -9,7 +9,6 @@ Flask-Cors==4.0.0
 gpip==0.4.7
 gunicorn==21.2.0
 idna==3.6
-install==1.3.5
 itsdangerous==2.1.2
 Jinja2==3.1.3
 MarkupSafe==2.1.5
