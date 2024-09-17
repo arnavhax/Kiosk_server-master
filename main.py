@@ -39,17 +39,16 @@ def load_try_status():
 
 def save_tray_status(tray_status):
     with open(TRAY_STATUS_FILE, 'w') as f:
-        json.dump(tray_status,f)
+        json.dump(tray_status, f)
         
 
-def print_file_with_tray_management(temp_file, num_pages,copies):
+def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     tray_status = load_try_status() 
     current_tray = tray_status["current_tray"]
     tray2_pages_remaining = tray_status["tray2_pages_remaining"]
     
     
     conn = cups.Connection()
-    
     if (conn is None):
         raise Exception("Cups Connection not Created")
     
@@ -64,8 +63,8 @@ def print_file_with_tray_management(temp_file, num_pages,copies):
         if current_tray == "Tray3":
             print(f"Attempting to print from Tray3 on printer {selected_printer}")
             options = {
-                'InputSlot': "Tray3",  # Use Tray3
-                'copies': str(copies)
+                'copies': str(copies),
+                'multiple-document-handling':'separate-documents-collated-copies' if double_page else 'single_document'
             }
             job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
 
@@ -112,6 +111,8 @@ def print_file_with_tray_management(temp_file, num_pages,copies):
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         return {"status": "error", "message": str(e)}
+    
+
 ##########################
 @app.route('/printNew', methods=['POST', 'GET'])
 def print_route_new():
@@ -119,10 +120,10 @@ def print_route_new():
     if request.method == 'POST':
         try:
             if 'pdf' not in request.json:
-                return Response(json.dumps({'error': 'No file received'}), status=400, content_type='application/json')
+                return Response(json.dumps({'error': 'No file received'}), status = 400, content_type='application/json')
             
             files = request.json.get('pdf')
-            jobs.append(files)  # Store the files for the GET route to process
+            jobs.append(files)
 
             return jsonify({'status': 'Printing started'}), 200
 
@@ -132,7 +133,6 @@ def print_route_new():
     elif request.method == 'GET':
         def generate_events():
             try:
-                
                 while jobs:
                     files = jobs.pop(0)
                     for file in files:
@@ -162,7 +162,7 @@ def print_route_new():
                         num_pages = len(selected_pages)
                         
                         # Attempt to print using tray management
-                        result = print_file_with_tray_management(temp, num_pages, copies)
+                        result = print_file_with_tray_management(temp, num_pages, copies, double_page)
                         if result["status"] == "error":
                             yield f"data: {json.dumps({'error': result['message']})}\n\n"
                         else:
