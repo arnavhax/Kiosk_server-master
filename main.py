@@ -64,7 +64,7 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
             print(f"Attempting to print from Tray3 on printer {selected_printer}")
             options = {
                 'copies': str(copies),
-                'multiple-document-handling':'separate-documents-collated-copies' if double_page else 'single_document'
+                'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
             }
             job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
 
@@ -72,8 +72,14 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
             while conn.getJobAttributes(job_id)["job-state"] != 9:
                 time.sleep(2)
 
-            print("Job successfully printed from Tray3")
-            return {"status": "success", "tray": "Tray3"}
+            job_attrs = conn.getJobAttributes(job_id)
+
+            # Look for tray information in the job attributes (exact key may vary by printer)
+            tray_used = job_attrs.get("media-col", {}).get("media-source", "unknown")
+            print(f"Job completed. Tray used: {tray_used}")
+
+            return {"status": "success", "tray": tray_used}
+
         elif current_tray == "Tray2":
             if tray2_pages_remaining >= num_pages * copies:
                 print(f"Attempting to print from Tray2 on printer {selected_printer}")
