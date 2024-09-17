@@ -73,9 +73,10 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
                 time.sleep(2)
 
             job_attrs = conn.getJobAttributes(job_id)
-
+            print(job_attrs)
             # Look for tray information in the job attributes (exact key may vary by printer)
-            tray_used = job_attrs.get("media-col", {}).get("media-source", "unknown")
+            tray_used = job_attrs.get("media-col", {}).get("InputSlot", "unknown")
+            
             print(f"Job completed. Tray used: {tray_used}")
 
             return {"status": "success", "tray": tray_used}
