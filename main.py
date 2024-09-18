@@ -59,7 +59,7 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     selected_printer = list(printers.keys())[0]
     
     try:
-
+        double_page =bool(double_page)
         if pages_remaining >= num_pages * copies:
             options = {
                 'copies': str(copies),
