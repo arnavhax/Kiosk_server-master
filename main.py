@@ -44,8 +44,7 @@ def save_tray_status(tray_status):
 
 def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     tray_status = load_try_status() 
-    current_tray = tray_status["current_tray"]
-    tray2_pages_remaining = tray_status["tray2_pages_remaining"]
+    pages_remaining = tray_status['pages_remaining']
     
     
     conn = cups.Connection()
@@ -60,69 +59,62 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     selected_printer = list(printers.keys())[0]
     
     try:
-        if current_tray == "Tray3":
-            print(f"Attempting to print from Tray3 on printer {selected_printer}")
+
+        if pages_remaining >= num_pages * copies:
             options = {
-                'InputSlot' : 'Tray3',
                 'copies': str(copies),
-                'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
+                'multiple-document-handling': 'separated-documents-collated-copies' if double_page else 'single_document'
             }
-            job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
-
-            # Wait for job completion or failure
-            while conn.getJobAttributes(job_id)["job-state"] != 9:
-                print(conn.getJobAttributes(job_id)["job-state"])
-                time.sleep(2)
-
-            job_attrs = conn.getJobAttributes(job_id)
-            print(job_attrs)
-            # Look for tray information in the job attributes (exact key may vary by printer)
-            tray_used = job_attrs.get("media-col", {}).get("InputSlot", "unknown")
             
-            print(f"Job completed. Tray used: {tray_used}")
-
-            return {"status": "success", "tray": tray_used}
-
-        elif current_tray == "Tray2":
-            if tray2_pages_remaining >= num_pages * copies:
-                print(f"Attempting to print from Tray2 on printer {selected_printer}")
-                options = {
-                    'InputSlot': "Tray2",  # Use Tray2
-                    'copies': str(copies)
-                }
-                job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
-
-                # Wait for job completion or failure
-                while conn.getJobAttributes(job_id)["job-state"] != 9:
-                    time.sleep(2)
-
-                # Subtract pages from Tray2
-                tray2_pages_remaining -= num_pages * copies
-                tray_status["tray2_pages_remaining"] = tray2_pages_remaining
-                save_tray_status(tray_status)  # Persist the updated tray status
-
-                print(f"Job successfully printed from Tray2. Pages remaining in Tray2: {tray2_pages_remaining}")
-                return {"status": "success", "tray": "Tray2", "pages_remaining": tray2_pages_remaining}
-            else:
-                raise Exception("Not enough pages remaining in Tray2 to complete the job.")
-    except cups.IPPError as e:
-        # Handle error where Tray3 runs out of paper and needs to switch to Tray2
-        error_str = str(e)
-        if "media-empty" in error_str or "not enough pages" in error_str:
-            print("Detected 'Out of Paper' or not enough pages in the current tray.")
-            tray_status["current_tray"] = "Tray2"
+            job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
+            
+            while conn.getJobAttributes(job_id)["job-state"] != 9:
+                time.sleep(2)
+            
+            pages_remaining -= num_pages * copies
+            tray_status['pages_remaining'] = pages_remaining
+            
             save_tray_status(tray_status)
-            return {"status": "switching", "message": "Switched to Tray2"}
+            
+            if (pages_remaining <= 50):
+                pass
+                # write notify logic here
+            
         else:
-            print(f"Print job failed: {str(e)}")
-            return {"status": "error", "message": "Print job failed due to another issue."}
-
+            raise Exception("Not enough pages remaining to complete the job.")
+    except cups.IPPError as e:
+        print(f"Print job failed: {str(e)}")
+        return {"status": "error", "message": "Print job failed due to cups issue."}
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         return {"status": "error", "message": str(e)}
     
+@app.route('/resetPages', methods=['POST'])
+def reset_pages():
+    reset_value = request.args.get('pages')
+    if (not (reset_value == 200 or reset_value == 500 or reset_value == 700)):
+        return jsonify({'message': 'Invalid reset value'}), 400
+    try:
+        tray_status = load_try_status()
+        
+        tray_status['pages_remaining'] = reset_value
+        save_tray_status(tray_status)
+        ##
+        return jsonify({'message': 'Pages count reset successfully'}), 200
+    except Exception as e:
+        return jsonify({'message': f'Some error occured \n {e}'}), 400
 
-##########################
+
+@app.route('/getPages', methods=['GET'])
+def get_pages():
+    try:
+        tray_status = load_try_status()
+        pages = tray_status['pages_remaining']
+        return jsonify({'pages': pages}), 200
+    except Exception as e:
+        return jsonify({'message': f'Some error occured \n {e}'}), 400  
+
+
 @app.route('/printNew', methods=['POST', 'GET'])
 def print_route_new():
     global jobs
