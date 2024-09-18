@@ -63,6 +63,7 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
         if current_tray == "Tray3":
             print(f"Attempting to print from Tray3 on printer {selected_printer}")
             options = {
+                'InputSlot' : 'Tray3'
                 'copies': str(copies),
                 'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
             }
@@ -70,6 +71,7 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
 
             # Wait for job completion or failure
             while conn.getJobAttributes(job_id)["job-state"] != 9:
+                print(conn.getJobAttributes(job_id)["job-state"])
                 time.sleep(2)
 
             job_attrs = conn.getJobAttributes(job_id)
