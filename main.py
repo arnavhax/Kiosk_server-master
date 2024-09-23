@@ -40,46 +40,47 @@ def load_try_status():
 def save_tray_status(tray_status):
     with open(TRAY_STATUS_FILE, 'w') as f:
         json.dump(tray_status, f)
-        
+
+
+# deduct pages          post
+# check cartridge level  get
+
+def deduct_pages(pages):
+    tray_status = load_try_status()
+    deduct = pages
+    pages_remaining = tray_status['pages_remaining_tray2']+tray_status['pages_remaining_tray3']
+    
+    if (deduct > tray_status['pages_remaining_tray3']):
+        tray_status['pages_remaining_tray3'] = 0
+        tray_status['pages_remaining_tray2'] -= (deduct - tray_status['pages_remaining_tray3'])
+    else:
+        tray_status['pages_remaining_tray3'] -= deduct
+    
+    save_tray_status(tray_status)
+
 
 def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
-    tray_status = load_try_status() 
-    pages_remaining = tray_status['pages_remaining']
-    
     
     conn = cups.Connection()
     if (conn is None):
         raise Exception("Cups Connection not Created")
-    
     
     printers = conn.getPrinters()
     
     if len(printers) == 0:
         raise Exception("No printers found")
     selected_printer = list(printers.keys())[0]
-    
+    print("Printer state is", selected_printer['printer-state'])
     try:
-        double_page =bool(double_page)
-        if pages_remaining >= num_pages * copies:
-            options = {
-                'copies': str(copies),
-                'multiple-document-handling': 'separated-documents-collated-copies' if double_page else 'single_document'
-            }
+        options = {
+            'copies': str(copies),
+            'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
+        }
             
-            job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
+        job_id = conn.printFile(selected_printer, temp_file, "", options )
             
-            while conn.getJobAttributes(job_id)["job-state"] != 9:
-                time.sleep(2)
-            
-            pages_remaining -= num_pages * copies
-            tray_status['pages_remaining'] = pages_remaining
-            
-            save_tray_status(tray_status)
-            
-            if (pages_remaining <= 50):
-                pass
-                # write notify logic here
-            
+        while conn.getJobAttributes(job_id)["job-state"] != 9:
+            time.sleep(2)
         else:
             raise Exception("Not enough pages remaining to complete the job.")
     except cups.IPPError as e:
@@ -88,7 +89,8 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         return {"status": "error", "message": str(e)}
-    
+
+
 @app.route('/resetPages', methods=['POST'])
 def reset_pages():
     reset_value = request.args.get('pages')
@@ -96,10 +98,15 @@ def reset_pages():
         return jsonify({'message': 'Invalid reset value'}), 400
     try:
         tray_status = load_try_status()
-        
-        tray_status['pages_remaining'] = reset_value
+        if (reset_value == 200):
+            tray_status['pages_remaining_tray2'] = reset_value
+        elif (reset_value == 500):
+            tray_status['pages_remaining_tray3'] = reset_value
+        else:
+            tray_status['pages_remaining_tray2'] = 200
+            tray_status['pages_remaining_tray3'] = 500
+    
         save_tray_status(tray_status)
-        ##
         return jsonify({'message': 'Pages count reset successfully'}), 200
     except Exception as e:
         return jsonify({'message': f'Some error occured \n {e}'}), 400
@@ -109,7 +116,7 @@ def reset_pages():
 def get_pages():
     try:
         tray_status = load_try_status()
-        pages = tray_status['pages_remaining']
+        pages = tray_status['pages_remaining_tray2']+tray_status['pages_remaining_tray3']
         return jsonify({'pages': pages}), 200
     except Exception as e:
         return jsonify({'message': f'Some error occured \n {e}'}), 400  
@@ -121,7 +128,7 @@ def print_route_new():
     if request.method == 'POST':
         try:
             if 'pdf' not in request.json:
-                return Response(json.dumps({'error': 'No file received'}), status = 400, content_type='application/json')
+                return Response(json.dumps({'error': 'No file received'}), status =400, content_type='application/json')
             
             files = request.json.get('pdf')
             jobs.append(files)
@@ -171,7 +178,7 @@ def print_route_new():
                         
                         os.remove(temp)
             
-                    yield f"data: {json.dumps({'completed' : 'yes'})}\n\n"
+                yield f"data: {json.dumps({'completed' : 'yes'})}\n\n"
             
             except Exception as e:
                 yield f"data: {{'error': 'An unexpected error occurred', 'details': '{str(e)}'}}\n\n"
