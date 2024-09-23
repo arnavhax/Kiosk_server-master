@@ -74,10 +74,10 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     try:
         options = {
             'copies': str(copies),
-            'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
+            'multiple-document-handling': 'separate-documents-collated-copies' if double_page == "double" else 'single_document'
         }
             
-        job_id = conn.printFile(selected_printer, temp_file, "", options )
+        job_id = conn.printFile(selected_printer, temp_file, "", options)
             
         while conn.getJobAttributes(job_id)["job-state"] != 9:
             time.sleep(2)
