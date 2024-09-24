@@ -32,7 +32,7 @@ TRAY_STATUS_FILE = 'tray_status.json'
 jobs = []
 
 
-def load_try_status():
+def load_tray_status():
     with open(TRAY_STATUS_FILE, 'r') as f:
         return json.load(f)
 
@@ -81,8 +81,7 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
             
         while conn.getJobAttributes(job_id)["job-state"] != 9:
             time.sleep(2)
-        else:
-            raise Exception("Not enough pages remaining to complete the job.")
+            
     except cups.IPPError as e:
         print(f"Print job failed: {str(e)}")
         return {"status": "error", "message": "Print job failed due to cups issue."}
