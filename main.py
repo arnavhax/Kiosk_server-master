@@ -68,11 +68,9 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     
     printers = conn.getPrinters()
     print("Printers", printers)
-    if len(printers) == 0:
-        raise Exception("No printers found")
     selected_printer = list(printers.keys())[0]
     print("Printer state is", selected_printer['printer-state'])
-    print("Printer is",selected_printer)
+    print("Printer is", selected_printer)
     try:
         options = {
             'copies': str(copies),
