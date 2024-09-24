@@ -72,7 +72,7 @@ def print_file_with_tray_management(temp_file, copies, double_page):
         print("inside try")
         options = {
             'copies': str(copies),
-            'multiple-document-handling': 'separated-documents-collated-copies' if double_page else 'single_document'
+            'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
         }
         print("Sending Job") 
         job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
@@ -170,11 +170,12 @@ def print_route_new():
                         if result["status"] == "error":
                             yield f"data: {json.dumps({'error': result['message']})}\n\n"
                         else:
+                            deduct_pages(len(selected_pages))
                             yield f"data: {json.dumps({'Current Job': file['name'], 'completed':'no', 'tray': result['tray']})}\n\n"
                         
                         os.remove(temp)
             
-                yield f"data: {json.dumps({'completed' : 'yes'})}\n\n"
+                    yield f"data: {json.dumps({'completed' : 'yes'})}\n\n"
             
             except Exception as e:
                 yield f"data: {{'error': 'An unexpected error occurred', 'details': '{str(e)}'}}\n\n"
