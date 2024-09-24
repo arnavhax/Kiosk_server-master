@@ -59,7 +59,7 @@ def deduct_pages(pages):
     save_tray_status(tray_status)
 
 
-def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
+def print_file_with_tray_management(temp_file, copies, double_page):
     
     conn = cups.Connection()
     print("creating connection")
@@ -67,18 +67,19 @@ def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
         raise Exception("Cups Connection not Created")
     
     printers = conn.getPrinters()
-    print("Printers", printers)
+    print("selecting", list(printers.keys())[0])
     selected_printer = list(printers.keys())[0]
     print("Printer state is", selected_printer['printer-state'])
     print("Printer is", selected_printer)
     try:
         options = {
             'copies': str(copies),
-            'multiple-document-handling': 'separate-documents-collated-copies' if double_page else 'single_document'
+            'multiple-document-handling': 'separated-documents-collated-copies' if double_page else 'single_document'
         }
             
         job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
-            
+        print("Job_id",job_id)
+        
         while conn.getJobAttributes(job_id)["job-state"] != 9:
             time.sleep(2)
             
@@ -165,11 +166,8 @@ def print_route_new():
                         with open(temp, 'wb') as f:
                             f.write(pdf_binary_data)
                         
-                        # Number of pages in the file
-                        num_pages = len(selected_pages)
-                        
                         # Attempt to print using tray management
-                        result = print_file_with_tray_management(temp, num_pages, copies, double_page)
+                        result = print_file_with_tray_management(temp, copies, double_page)
                         if result["status"] == "error":
                             yield f"data: {json.dumps({'error': result['message']})}\n\n"
                         else:
