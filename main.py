@@ -73,7 +73,7 @@ def print_file_with_tray_management(temp_file, copies, double_page):
         print("double page option", double_page)
         options = {
             'copies': str(copies),
-            'multiple-document-handling': 'separate-documents-collated-copies' if double_page == "double" else 'single_document'
+            'multiple-document-handling': 'separate-documents-collated-copies' if double_page == "single" else 'single_document'
         }
         print("Sending Job") 
         job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
