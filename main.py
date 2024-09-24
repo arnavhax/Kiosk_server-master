@@ -70,6 +70,7 @@ def print_file_with_tray_management(temp_file, copies, double_page):
     selected_printer = list(printers.keys())[0]
     try:
         print("inside try")
+        print("double page option", double_page)
         options = {
             'copies': str(copies),
             'multiple-document-handling': 'separate-documents-collated-copies' if double_page == "double" else 'single_document'
