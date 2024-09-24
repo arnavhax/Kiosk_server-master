@@ -62,15 +62,17 @@ def deduct_pages(pages):
 def print_file_with_tray_management(temp_file, num_pages, copies, double_page):
     
     conn = cups.Connection()
+    print("creating connection")
     if (conn is None):
         raise Exception("Cups Connection not Created")
     
     printers = conn.getPrinters()
-    
+    print("Printers", printers)
     if len(printers) == 0:
         raise Exception("No printers found")
     selected_printer = list(printers.keys())[0]
     print("Printer state is", selected_printer['printer-state'])
+    print("Printer is",selected_printer)
     try:
         options = {
             'copies': str(copies),
