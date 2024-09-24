@@ -46,9 +46,8 @@ def save_tray_status(tray_status):
 # check cartridge level  get
 
 def deduct_pages(pages):
-    tray_status = load_try_status()
+    tray_status = load_tray_status()
     deduct = pages
-    pages_remaining = tray_status['pages_remaining_tray2']+tray_status['pages_remaining_tray3']
     
     if (deduct > tray_status['pages_remaining_tray3']):
         tray_status['pages_remaining_tray3'] = 0
@@ -69,18 +68,18 @@ def print_file_with_tray_management(temp_file, copies, double_page):
     printers = conn.getPrinters()
     print("selecting", list(printers.keys())[0])
     selected_printer = list(printers.keys())[0]
-    print("Printer state is", selected_printer['printer-state'])
-    print("Printer is", selected_printer)
     try:
+        print("inside try")
         options = {
             'copies': str(copies),
             'multiple-document-handling': 'separated-documents-collated-copies' if double_page else 'single_document'
         }
-            
+        print("Sending Job") 
         job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
         print("Job_id",job_id)
         
         while conn.getJobAttributes(job_id)["job-state"] != 9:
+            print("inside while")
             time.sleep(2)
             
     except cups.IPPError as e:
@@ -97,7 +96,7 @@ def reset_pages():
     if (not (reset_value == 200 or reset_value == 500 or reset_value == 700)):
         return jsonify({'message': 'Invalid reset value'}), 400
     try:
-        tray_status = load_try_status()
+        tray_status = load_tray_status()
         if (reset_value == 200):
             tray_status['pages_remaining_tray2'] = reset_value
         elif (reset_value == 500):
@@ -115,7 +114,7 @@ def reset_pages():
 @app.route('/getPages', methods=['GET'])
 def get_pages():
     try:
-        tray_status = load_try_status()
+        tray_status = load_tray_status()
         pages = tray_status['pages_remaining_tray2']+tray_status['pages_remaining_tray3']
         return jsonify({'pages': pages}), 200
     except Exception as e:
