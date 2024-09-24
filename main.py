@@ -82,6 +82,7 @@ def print_file_with_tray_management(temp_file, copies, double_page):
             print("inside while")
             time.sleep(2)
             
+        return {"status": "success", "message": "Print job completed."}
     except cups.IPPError as e:
         print(f"Print job failed: {str(e)}")
         return {"status": "error", "message": "Print job failed due to cups issue."}
