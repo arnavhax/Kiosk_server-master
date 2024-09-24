@@ -73,7 +73,7 @@ def print_file_with_tray_management(temp_file, copies, double_page):
         print("double page option", double_page)
         options = {
             'copies': str(copies),
-            'multiple-document-handling': 'separated-documents-collated-copies' if double_page == "single" else 'single_document'
+            'multiple-document-handling': 'separate-documents-collated-copies' if double_page == "single" else 'single_document'
         }
         print("Sending Job") 
         job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
@@ -187,3 +187,15 @@ def print_route_new():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
+    
+
+
+# cartridge status 
+# printer connectivity
+# printer status - code
+# printer test cases
+# restart or abort
+# printnewpage for testing
+# page count updation after every file
+# file status fix
+# double page fix
