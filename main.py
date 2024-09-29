@@ -112,7 +112,33 @@ def reset_pages():
     except Exception as e:
         return jsonify({'message': f'Some error occured \n {e}'}), 400
 
+@app.route('/printTest')
+def printtest():
+    pdf_name = "pdf-test.pdf"
+    conn = cups.Connection()
+    printer = conn.getPrinters()
+    print(printer)
 
+    # Safe guarding for no printer
+    if not printer:
+        return "No Printer Connected"
+
+    selected_printer = list(printer.keys())[0]
+    double_sided = False
+    copies = 1
+
+    options = {
+        'multiple-document-handling': 'separate-documents-collated-copies' if double_sided else 'single_document',
+        'copies': str(copies)
+    }
+
+    try:
+        conn.printFile(selected_printer, pdf_name, "", options)
+        return f"PRINTING SERVER IS WORKING: PRINTER : {printer}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+	
 @app.route('/getPages', methods=['GET'])
 def get_pages():
     try:
@@ -129,10 +155,10 @@ def print_route_new():
     if request.method == 'POST':
         try:
             if 'pdf' not in request.json:
-                return Response(json.dumps({'error': 'No file received'}), status =400, content_type='application/json')
+                return Response(json.dumps({'error': 'No file received'}), status=400, content_type='application/json')
             
             files = request.json.get('pdf')
-            jobs.append(files)
+            jobs.append(files)  # Store the files for the GET route to process
 
             return jsonify({'status': 'Printing started'}), 200
 
@@ -150,6 +176,7 @@ def print_route_new():
                         copies = file['numCopies']
                         selected_pages = file['selectedPages']
                         
+                        print("Options",double_page,copies,selected_pages)
                         pdf_file = base64.b64decode(blob_data)
                         pdf_reader = PdfReader(io.BytesIO(pdf_file))
                         
@@ -167,15 +194,28 @@ def print_route_new():
                         with open(temp, 'wb') as f:
                             f.write(pdf_binary_data)
                         
-                        # Attempt to print using tray management
-                        result = print_file_with_tray_management(temp, copies, double_page)
-                        if result["status"] == "error":
-                            yield f"data: {json.dumps({'error': result['message']})}\n\n"
-                        else:
-                            deduct_pages(len(selected_pages))
-                            yield f"data: {json.dumps({'Current Job': file['name'], 'completed':'no', 'tray': result['tray']})}\n\n"
-                        
-                        os.remove(temp)
+                        if temp and temp.endswith('.pdf'):
+                            conn = cups.Connection()
+                            printers = conn.getPrinters()
+                            if len(printers) == 0:
+                                raise Exception("No printers found")
+                            selected_printer = list(printers.keys())[0]  # Assuming the first printer in the list
+                            
+                            options = {
+                                'multiple-document-handling': 'separate-documents-collated-copies' if double_page == 'double' else 'single_document',
+                                'copies': str(copies)
+                            }
+                            print(options)
+                            
+                            job_info = conn.printFile(selected_printer, temp, "", options)
+                            
+                            while conn.getJobAttributes(job_info)["job-state"] != 9:
+                                time.sleep(5)
+                            
+                            yield f"data: {json.dumps({'Current Job': file['name'], 'completed':'no'})}\n\n"
+                            
+                            
+                            os.remove(temp)
             
                     yield f"data: {json.dumps({'completed' : 'yes'})}\n\n"
             
