@@ -203,7 +203,7 @@ def print_route_new():
                             
                             options = {
                                 'multiple-document-handling': 'separate-documents-collated-copies' if copies>1 else 'single_document',
-                                'side':'two-sided-long-edge' if double_page == 'double' else 'one-sided',
+                                'sides':'two-sided-long-edge' if double_page == 'double' else 'one-sided',
                                 'copies': str(copies)
                             }
                             print(options)
