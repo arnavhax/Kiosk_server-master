@@ -202,7 +202,8 @@ def print_route_new():
                             selected_printer = list(printers.keys())[0]  # Assuming the first printer in the list
                             
                             options = {
-                                'multiple-document-handling': 'separate-documents-collated-copies' if double_page == 'double' else 'single_document',
+                                'multiple-document-handling': 'separate-documents-collated-copies' if copies>1 else 'single_document',
+                                'side':'two-sided-long-edge' if double_page == 'double' else 'one-sided',
                                 'copies': str(copies)
                             }
                             print(options)
