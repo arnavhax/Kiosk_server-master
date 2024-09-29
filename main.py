@@ -32,87 +32,123 @@ TRAY_STATUS_FILE = 'tray_status.json'
 jobs = []
 
 
-def load_try_status():
+def load_tray_status():
     with open(TRAY_STATUS_FILE, 'r') as f:
         return json.load(f)
 
 
 def save_tray_status(tray_status):
     with open(TRAY_STATUS_FILE, 'w') as f:
-        json.dump(tray_status,f)
-        
+        json.dump(tray_status, f)
 
-def print_file_with_tray_management(temp_file, num_pages,copies):
-    tray_status = load_try_status() 
-    current_tray = tray_status["current_tray"]
-    tray2_pages_remaining = tray_status["tray2_pages_remaining"]
+
+# deduct pages          post
+# check cartridge level  get
+
+def deduct_pages(pages):
+    tray_status = load_tray_status()
+    deduct = pages
     
+    if (deduct > tray_status['pages_remaining_tray3']):
+        tray_status['pages_remaining_tray3'] = 0
+        tray_status['pages_remaining_tray2'] -= (deduct - tray_status['pages_remaining_tray3'])
+    else:
+        tray_status['pages_remaining_tray3'] -= deduct
+    
+    save_tray_status(tray_status)
+
+
+def print_file_with_tray_management(temp_file, copies, double_page):
     
     conn = cups.Connection()
-    
+    print("creating connection")
     if (conn is None):
         raise Exception("Cups Connection not Created")
     
-    
     printers = conn.getPrinters()
-    
-    if len(printers) == 0:
-        raise Exception("No printers found")
+    print("selecting", list(printers.keys())[0])
     selected_printer = list(printers.keys())[0]
-    
     try:
-        if current_tray == "Tray3":
-            print(f"Attempting to print from Tray3 on printer {selected_printer}")
-            options = {
-                'InputSlot': "Tray3",  # Use Tray3
-                'copies': str(copies)
-            }
-            job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
-
-            # Wait for job completion or failure
-            while conn.getJobAttributes(job_id)["job-state"] != 9:
-                time.sleep(2)
-
-            print("Job successfully printed from Tray3")
-            return {"status": "success", "tray": "Tray3"}
-        elif current_tray == "Tray2":
-            if tray2_pages_remaining >= num_pages * copies:
-                print(f"Attempting to print from Tray2 on printer {selected_printer}")
-                options = {
-                    'InputSlot': "Tray2",  # Use Tray2
-                    'copies': str(copies)
-                }
-                job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
-
-                # Wait for job completion or failure
-                while conn.getJobAttributes(job_id)["job-state"] != 9:
-                    time.sleep(2)
-
-                # Subtract pages from Tray2
-                tray2_pages_remaining -= num_pages * copies
-                tray_status["tray2_pages_remaining"] = tray2_pages_remaining
-                save_tray_status(tray_status)  # Persist the updated tray status
-
-                print(f"Job successfully printed from Tray2. Pages remaining in Tray2: {tray2_pages_remaining}")
-                return {"status": "success", "tray": "Tray2", "pages_remaining": tray2_pages_remaining}
-            else:
-                raise Exception("Not enough pages remaining in Tray2 to complete the job.")
+        print("inside try")
+        print("double page option", double_page)
+        options = {
+            'copies': str(copies),
+            'multiple-document-handling': 'separate-documents-collated-copies' if double_page == "single" else 'single_document'
+        }
+        print("Sending Job") 
+        job_id = conn.printFile(selected_printer, temp_file, "Print Job", options)
+        print("Job_id",job_id)
+        
+        while conn.getJobAttributes(job_id)["job-state"] != 9:
+            print("inside while")
+            time.sleep(2)
+            
+        return {"status": "success", "message": "Print job completed."}
     except cups.IPPError as e:
-        # Handle error where Tray3 runs out of paper and needs to switch to Tray2
-        error_str = str(e)
-        if "media-empty" in error_str or "not enough pages" in error_str:
-            print("Detected 'Out of Paper' or not enough pages in the current tray.")
-            tray_status["current_tray"] = "Tray2"
-            save_tray_status(tray_status)
-            return {"status": "switching", "message": "Switched to Tray2"}
-        else:
-            print(f"Print job failed: {str(e)}")
-            return {"status": "error", "message": "Print job failed due to another issue."}
-
+        print(f"Print job failed: {str(e)}")
+        return {"status": "error", "message": "Print job failed due to cups issue."}
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         return {"status": "error", "message": str(e)}
-##########################
+
+
+@app.route('/resetPages', methods=['POST'])
+def reset_pages():
+    reset_value = request.args.get('pages')
+    if (not (reset_value == 200 or reset_value == 500 or reset_value == 700)):
+        return jsonify({'message': 'Invalid reset value'}), 400
+    try:
+        tray_status = load_tray_status()
+        if (reset_value == 200):
+            tray_status['pages_remaining_tray2'] = reset_value
+        elif (reset_value == 500):
+            tray_status['pages_remaining_tray3'] = reset_value
+        else:
+            tray_status['pages_remaining_tray2'] = 200
+            tray_status['pages_remaining_tray3'] = 500
+    
+        save_tray_status(tray_status)
+        return jsonify({'message': 'Pages count reset successfully'}), 200
+    except Exception as e:
+        return jsonify({'message': f'Some error occured \n {e}'}), 400
+
+@app.route('/printTest')
+def printtest():
+    pdf_name = "pdf-test.pdf"
+    conn = cups.Connection()
+    printer = conn.getPrinters()
+    print(printer)
+
+    # Safe guarding for no printer
+    if not printer:
+        return "No Printer Connected"
+
+    selected_printer = list(printer.keys())[0]
+    double_sided = False
+    copies = 1
+
+    options = {
+        'multiple-document-handling': 'separate-documents-collated-copies' if double_sided else 'single_document',
+        'copies': str(copies)
+    }
+
+    try:
+        conn.printFile(selected_printer, pdf_name, "", options)
+        return f"PRINTING SERVER IS WORKING: PRINTER : {printer}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+	
+@app.route('/getPages', methods=['GET'])
+def get_pages():
+    try:
+        tray_status = load_tray_status()
+        pages = tray_status['pages_remaining_tray2']+tray_status['pages_remaining_tray3']
+        return jsonify({'pages': pages}), 200
+    except Exception as e:
+        return jsonify({'message': f'Some error occured \n {e}'}), 400  
+
+
 @app.route('/printNew', methods=['POST', 'GET'])
 def print_route_new():
     global jobs
@@ -132,7 +168,6 @@ def print_route_new():
     elif request.method == 'GET':
         def generate_events():
             try:
-                
                 while jobs:
                     files = jobs.pop(0)
                     for file in files:
@@ -141,6 +176,7 @@ def print_route_new():
                         copies = file['numCopies']
                         selected_pages = file['selectedPages']
                         
+                        print("Options",double_page,copies,selected_pages)
                         pdf_file = base64.b64decode(blob_data)
                         pdf_reader = PdfReader(io.BytesIO(pdf_file))
                         
@@ -158,17 +194,29 @@ def print_route_new():
                         with open(temp, 'wb') as f:
                             f.write(pdf_binary_data)
                         
-                        # Number of pages in the file
-                        num_pages = len(selected_pages)
-                        
-                        # Attempt to print using tray management
-                        result = print_file_with_tray_management(temp, num_pages, copies)
-                        if result["status"] == "error":
-                            yield f"data: {json.dumps({'error': result['message']})}\n\n"
-                        else:
-                            yield f"data: {json.dumps({'Current Job': file['name'], 'completed':'no', 'tray': result['tray']})}\n\n"
-                        
-                        os.remove(temp)
+                        if temp and temp.endswith('.pdf'):
+                            conn = cups.Connection()
+                            printers = conn.getPrinters()
+                            if len(printers) == 0:
+                                raise Exception("No printers found")
+                            selected_printer = list(printers.keys())[0]  # Assuming the first printer in the list
+                            
+                            options = {
+                                'multiple-document-handling': 'separate-documents-collated-copies' if copies>1 else 'single_document',
+                                'sides':'two-sided-long-edge' if double_page == 'double' else 'one-sided',
+                                'copies': str(copies)
+                            }
+                            print(options)
+                            
+                            job_info = conn.printFile(selected_printer, temp, "", options)
+                            
+                            while conn.getJobAttributes(job_info)["job-state"] != 9:
+                                time.sleep(5)
+                            
+                            yield f"data: {json.dumps({'Current Job': file['name'], 'completed':'no'})}\n\n"
+                            
+                            
+                            os.remove(temp)
             
                     yield f"data: {json.dumps({'completed' : 'yes'})}\n\n"
             
@@ -181,3 +229,14 @@ def print_route_new():
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
     
+
+
+# cartridge status 
+# printer connectivity
+# printer status - code
+# printer test cases
+# restart or abort
+# printnewpage for testing
+# page count updation after every file
+# file status fix
+# double page fix
