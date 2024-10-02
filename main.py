@@ -17,14 +17,13 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app, supports_credentials=True)
 
-CLOUD_SERVER_URL = 'https://files-server.onrender.com'  
+CLOUD_SERVER_URL = 'https://files-server.onrender.com' 
 
 session = requests.Session()
 
 
-#@app.route('/deductPages', methods=['POST'])
+
 def deduct_pages(deduct):
-    #deduct = request.args.get('pages')
     print("Deductiong Pages")
     if (deduct <= 0):
         return jsonify({'message': 'Invalid deduct value'}), 400
@@ -38,9 +37,10 @@ def deduct_pages(deduct):
         
         save_tray_status(tray_status)
         print("DEDUCTED PAGES")
-        return jsonify({'message': 'Pages count deducted successfully'}), 200
+        return 200
     except Exception as e:
-        return jsonify({'message': f'Some error occured \n {e}'}), 400
+        print("Log exception here", e)
+        return 400
 
 @app.route('/resetPages', methods=['POST'])
 def reset_pages():
@@ -123,7 +123,10 @@ def print_route_new():
                         job_pages=int(len(selected_pages))
                     total_pages=job_pages*int(copies)
                     print("TOTAL PAGES",total_pages)
-                    res=deduct_pages(total_pages)
+                    code = deduct_pages(total_pages)
+                    
+                    if(code != 200):
+                        raise Exception("Deduct pages failed")
                     
                     print("Options", double_page, copies, selected_pages)
                     pdf_file = base64.b64decode(blob_data)
