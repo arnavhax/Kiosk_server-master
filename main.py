@@ -171,7 +171,7 @@ def is_printer_connected():
         printers = conn.getPrinters()
 
         if not printers:
-            return jsonify({'status': 'false', 'message': 'No printers found.'}), 404
+            return jsonify({'status': False, 'message': 'No printers found.'}), 404
 
         # Assuming we are checking the first printer
         printer_name = list(printers.keys())[0]
@@ -183,23 +183,23 @@ def is_printer_connected():
         # Check if any of the issue reasons are present
         if any(reason in printer_state_reason for reason in PRINTER_ISSUE_REASONS):
             return jsonify({
-                'status': 'false',
+                'status': False ,
                 'message': f"Printer is not connected or has issues: {', '.join(printer_state_reason)}",
                 'printer_state_reason': printer_state_reason
             }), 200
         else:
             return jsonify({
-                'status': 'true',
+                'status': True,
                 'message': 'Printer is connected and ready.',
                 'printer_state_reason': printer_state_reason
             }), 200
 
     except cups.IPPError as e:
         # Handle specific CUPS errors
-        return jsonify({'status': 'false', 'message': f'IPP Error: {str(e)}'}), 500
+        return jsonify({'status': False, 'message': f'IPP Error: {str(e)}'}), 500
     except Exception as e:
         # General error handling
-        return jsonify({'status': 'false', 'message': f'An unexpected error occurred: {str(e)}'}), 500
+        return jsonify({'status': False, 'message': f'An unexpected error occurred: {str(e)}'}), 500
 
 
 @app.route('/printerStatus', methods=['GET'])
@@ -256,38 +256,8 @@ if __name__ == '__main__':
 
 
 # cartridge status ??
-
 # printer test cases ?
 # restart or abort ?
 # printnewpage for testing ???
 # page count updation after every file ?
 
-
-
-
-
-# @app.route('/printTest')
-# def printtest():
-#     pdf_name = "../data/pdf-test.pdf"
-#     conn = cups.Connection()
-#     printer = conn.getPrinters()
-#     print(printer)
-
-#     # Safe guarding for no printer
-#     if not printer:
-#         return "No Printer Connected"
-
-#     selected_printer = list(printer.keys())[0]
-#     double_sided = False
-#     copies = 1
-
-#     options = {
-#         'multiple-document-handling': 'separate-documents-collated-copies' if double_sided else 'single_document',
-#         'copies': str(copies)
-#     }
-
-#     try:
-#         conn.printFile(selected_printer, pdf_name, "", options)
-#         return f"PRINTING SERVER IS WORKING: PRINTER : {printer}"
-#     except Exception as e:
-#         return f"Error: {str(e)}"
