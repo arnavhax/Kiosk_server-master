@@ -12,6 +12,7 @@ import secrets
 from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
+import math
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app, supports_credentials=True)
@@ -21,9 +22,10 @@ CLOUD_SERVER_URL = 'https://files-server.onrender.com'
 session = requests.Session()
 
 
-@app.route('/deductPages', methods=['POST'])
-def deduct_pages():
-    deduct = request.args.get('pages')
+#@app.route('/deductPages', methods=['POST'])
+def deduct_pages(deduct):
+    #deduct = request.args.get('pages')
+    print("Deductiong Pages")
     if (deduct <= 0):
         return jsonify({'message': 'Invalid deduct value'}), 400
     try:
@@ -35,7 +37,7 @@ def deduct_pages():
             tray_status['pages_remaining_tray3'] -= deduct
         
         save_tray_status(tray_status)
-        
+        print("DEDUCTED PAGES")
         return jsonify({'message': 'Pages count deducted successfully'}), 200
     except Exception as e:
         return jsonify({'message': f'Some error occured \n {e}'}), 400
@@ -110,6 +112,18 @@ def print_route_new():
                     double_page = file['selectedOption']
                     copies = file['numCopies']
                     selected_pages = file['selectedPages']
+
+
+                    ## DEDUCTING PAGES HERE 
+                    print("PRINTING ")
+    
+                    if double_page=='double':
+                        job_pages=math.ceil(int(len(selected_pages))/2)
+                    else:
+                        job_pages=int(len(selected_pages))
+                    total_pages=job_pages*int(copies)
+                    print("TOTAL PAGES",total_pages)
+                    res=deduct_pages(total_pages)
                     
                     print("Options", double_page, copies, selected_pages)
                     pdf_file = base64.b64decode(blob_data)
