@@ -11,7 +11,7 @@ import json
 import secrets
 from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
-
+from tools.reasons import PRINTER_ISSUE_REASONS
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app, supports_credentials=True)
@@ -102,8 +102,7 @@ def print_route_new():
                     yield f"data: {{'error': 'No jobs available'}}\n\n"
                     return
                 
-                # Process only the first job
-                files = jobs.pop(0)  # Process the first job
+                files = jobs.pop(0)  # Process the first and only job
                 save_jobs(jobs)  # Save the updated jobs list after removing the processed job
                 
                 for file in files:
@@ -162,6 +161,93 @@ def print_route_new():
 
 
 
+@app.route('/isPrinterConnected', methods=['GET'])
+def is_printer_connected():
+    try:
+        # Establish a connection to the CUPS server
+        conn = cups.Connection()
+
+        # Fetch the list of available printers
+        printers = conn.getPrinters()
+
+        if not printers:
+            return jsonify({'status': 'false', 'message': 'No printers found.'}), 404
+
+        # Assuming we are checking the first printer
+        printer_name = list(printers.keys())[0]
+
+        # Fetch printer attributes
+        printer_attributes = conn.getPrinterAttributes(printer_name)
+        printer_state_reason = printer_attributes.get('printer-state-reasons', [])
+
+        # Check if any of the issue reasons are present
+        if any(reason in printer_state_reason for reason in PRINTER_ISSUE_REASONS):
+            return jsonify({
+                'status': 'false',
+                'message': f"Printer is not connected or has issues: {', '.join(printer_state_reason)}",
+                'printer_state_reason': printer_state_reason
+            }), 200
+        else:
+            return jsonify({
+                'status': 'true',
+                'message': 'Printer is connected and ready.',
+                'printer_state_reason': printer_state_reason
+            }), 200
+
+    except cups.IPPError as e:
+        # Handle specific CUPS errors
+        return jsonify({'status': 'false', 'message': f'IPP Error: {str(e)}'}), 500
+    except Exception as e:
+        # General error handling
+        return jsonify({'status': 'false', 'message': f'An unexpected error occurred: {str(e)}'}), 500
+
+
+@app.route('/printerStatus', methods=['GET'])
+def get_printer_status():
+    try:
+        # Establish a connection to the CUPS server
+        conn = cups.Connection()
+
+        # Fetch the list of available printers
+        printers = conn.getPrinters()
+        
+        if not printers:
+            return jsonify({'status': 'error', 'message': 'No printers found.'}), 404
+
+        # Assuming we are checking the first printer
+        printer_name = list(printers.keys())[0]
+        printer_attributes = conn.getPrinterAttributes(printer_name)
+
+        # Get the printer state (3: Idle, 4: Processing, 5: Stopped)
+        printer_state = printer_attributes['printer-state']
+
+        # Printer state reasons give more specific information about issues
+        printer_state_reason = printer_attributes.get('printer-state-reasons', 'none')
+
+        # Handle different printer states according to CUPS official documentation
+        if printer_state == 3:
+            state_message = 'Printer is idle and ready to print.'
+        elif printer_state == 4:
+            state_message = 'Printer is currently processing a job.'
+        elif printer_state == 5:
+            state_message = 'Printer is stopped due to an issue.'
+        else:
+            state_message = 'Unknown printer state.'
+
+        return jsonify({
+            'status': 'success',
+            'printer_name': printer_name,
+            'printer_state': printer_state,
+            'state_message': state_message,
+            'printer_state_reason': printer_state_reason
+        }), 200
+
+    except cups.IPPError as e:
+        # Handle specific CUPS errors
+        return jsonify({'status': 'error', 'message': f'IPP Error: {str(e)}'}), 500
+    except Exception as e:
+        # General error handling
+        return jsonify({'status': 'error', 'message': f'An unexpected error occurred: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
@@ -170,8 +256,7 @@ if __name__ == '__main__':
 
 
 # cartridge status ??
-# printer connectivity  ?
-# printer status - code ?
+
 # printer test cases ?
 # restart or abort ?
 # printnewpage for testing ???
