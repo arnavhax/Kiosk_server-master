@@ -84,7 +84,9 @@ def print_route_new():
                     yield f"data: {{'error': 'No jobs available'}}\n\n"
                     return
                 
-                files = jobs.pop(0)  # Process the first and only job
+                files = jobs[0]
+                jobs = []  # Process the first and only job
+                print("jobs after popping" ,jobs)
                 save_jobs(jobs)  # Save the updated jobs list after removing the processed job
                 
                 for file in files:
