@@ -14,6 +14,8 @@ from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
 from tools.deduct_pages import deduct_pages
 import math
+from tools.get_mac_address import get_mac_address
+
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app, supports_credentials=True)
@@ -22,6 +24,17 @@ CLOUD_SERVER_URL = 'https://files-server.onrender.com'
 
 session = requests.Session()
 
+
+@app.route('/getKioskCredentials', methods=['GET'])
+def get_kiosk_credentials():
+    mac_address = get_mac_address()
+    kiosk_id = 6969 # environment variable set in kiosk server
+    
+    if mac_address is None or kiosk_id is None:
+        print("Mac_address or kiosk_id is missing")
+        return jsonify({'message': 'Kiosk_id or mac_address not found , hint: check for env config'}), 400
+    kiosk_id = int(kiosk_id)
+    return jsonify({'mac_address': mac_address, 'kiosk_id': kiosk_id}), 200
 
 @app.route('/resetPages', methods=['POST'])
 def reset_pages():
