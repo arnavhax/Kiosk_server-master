@@ -12,6 +12,7 @@ import secrets
 from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
+from tools.deduct_pages import deduct_pages
 import math
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -21,26 +22,6 @@ CLOUD_SERVER_URL = 'https://files-server.onrender.com'
 
 session = requests.Session()
 
-
-
-def deduct_pages(deduct):
-    print("Deductiong Pages")
-    if (deduct <= 0):
-        return jsonify({'message': 'Invalid deduct value'}), 400
-    try:
-        tray_status = load_tray_status()
-        if (deduct > tray_status['pages_remaining_tray3']):
-            tray_status['pages_remaining_tray3'] = 0
-            tray_status['pages_remaining_tray2'] -= (deduct - tray_status['pages_remaining_tray3'])
-        else:
-            tray_status['pages_remaining_tray3'] -= deduct
-        
-        save_tray_status(tray_status)
-        print("DEDUCTED PAGES")
-        return 200
-    except Exception as e:
-        print("Log exception here", e)
-        return 400
 
 @app.route('/resetPages', methods=['POST'])
 def reset_pages():
@@ -63,7 +44,6 @@ def reset_pages():
         return jsonify({'message': f'Some error occured \n {e}'}), 400
 
 
-	
 @app.route('/getPages', methods=['GET'])
 def get_pages():
     try:
@@ -117,15 +97,15 @@ def print_route_new():
                     ## DEDUCTING PAGES HERE 
                     print("PRINTING ")
     
-                    if double_page=='double':
-                        job_pages=math.ceil(int(len(selected_pages))/2)
+                    if double_page == 'double':
+                        job_pages = math.ceil(int(len(selected_pages))/2)
                     else:
-                        job_pages=int(len(selected_pages))
-                    total_pages=job_pages*int(copies)
-                    print("TOTAL PAGES",total_pages)
+                        job_pages = int(len(selected_pages))
+                    total_pages = job_pages*int(copies)
+                    print("TOTAL PAGES", total_pages)
                     code = deduct_pages(total_pages)
                     
-                    if(code != 200):
+                    if (code != 200):
                         raise Exception("Deduct pages failed")
                     
                     print("Options", double_page, copies, selected_pages)
@@ -163,7 +143,8 @@ def print_route_new():
                         job_info = conn.printFile(selected_printer, temp, "", options)
                         
                         while conn.getJobAttributes(job_info)["job-state"] != 9:
-                            time.sleep(5)
+                            print("Processing job")
+                            time.sleep(1)  # optimise this , find a way to make this more stable
                         
                         yield f"data: {json.dumps({'Current Job': file['name'], 'completed': 'no'})}\n\n"
                         
@@ -200,7 +181,7 @@ def is_printer_connected():
         # Check if any of the issue reasons are present
         if any(reason in printer_state_reason for reason in PRINTER_ISSUE_REASONS):
             return jsonify({
-                'status': False ,
+                'status': False,
                 'message': f"Printer is not connected or has issues: {', '.join(printer_state_reason)}",
                 'printer_state_reason': printer_state_reason
             }), 200
