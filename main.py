@@ -28,7 +28,7 @@ session = requests.Session()
 @app.route('/getKioskCredentials', methods=['GET'])
 def get_kiosk_credentials():
     mac_address = get_mac_address()
-    kiosk_id = 6969 # environment variable set in kiosk server
+    kiosk_id = 1 # environment variable set in kiosk server
     
     if mac_address is None or kiosk_id is None:
         print("Mac_address or kiosk_id is missing")
