@@ -1,1 +1,45 @@
-/virtual
+# Python bytecode files
+*.py[cod]
+__pycache__/
+
+# Environment variables
+.env
+*.env
+
+# Virtual environment folders
+venv/
+.venv/
+
+# Flask/Python-specific files
+instance/
+*.pyc
+*.pyo
+
+# Jupyter Notebook checkpoints (if any)
+.ipynb_checkpoints/
+
+# Log files
+*.log
+
+# Cache directories
+.cache/
+__pycache__/
+*.egg-info/
+
+# Static assets cache
+static/
+
+# Database files
+*.sqlite3
+*.db
+
+# PyCharm / VSCode project files
+.idea/
+.vscode/
+
+# macOS files
+.DS_Store
+
+# Flask session files
+
+/flask_session
