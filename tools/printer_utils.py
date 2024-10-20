@@ -60,6 +60,8 @@ def process_print_job(files):
             job_info = conn.printFile(selected_printer, temp, "", options)
 
             while conn.getJobAttributes(job_info)["job-state"] != 9:
+                if (conn.getJobAttributes(job_info)["job-state"] == 6 or conn.getJobAttributes(job_info)["job-state"] == 7 or conn.getJobAttributes(job_info)["job-state"] == 8):
+                    return {{'error': 'An unexpected error occurred', 'details': '{str(e)}'}}
                 print("Processing job")
                 time.sleep(1)
 

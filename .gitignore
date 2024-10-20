@@ -2,8 +2,6 @@
 .gitignore
 *.py[cod]
 __pycache__/
-
-data/
 # Environment variables
 .env
 *.env

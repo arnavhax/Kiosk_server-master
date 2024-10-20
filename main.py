@@ -8,9 +8,8 @@ from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
 from tools.get_mac_address import get_mac_address
-from flask import Response, request, jsonify
 from tools.printer_utils import process_print_job
-import time
+from tools.test import perform_test_print
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -46,7 +45,12 @@ def reset_pages():
             tray_status['pages_remaining_tray3'] = 500
     
         save_tray_status(tray_status)
-        return jsonify({'message': 'Pages count reset successfully'}), 200
+        message, response = perform_test_print("normal")
+        print(message, response)
+        if (response != 200):   # if test is unsuccessful
+            return jsonify({'message': message}), 401
+        
+        return jsonify({'message': 'Pages count reset and tested successfully'}), 200
     except Exception as e:
         return jsonify({'message': f'Some error occured \n {e}'}), 400
 
@@ -197,48 +201,14 @@ def get_printer_status():
 
 
 @app.route('/test', methods=['GET'])
-def test_print_route():
-    try:
-        # Get the query parameter (either "normal" or "shaded")
-        mode = request.args.get('mode')
-
-        # Validate mode
-        if mode not in ['normal', 'shaded']:
-            return jsonify({'error': 'Invalid mode, must be "normal" or "shaded"'}), 400
-        
-        # Define the file to print based on the mode
-        if mode == 'normal':
-            file_to_print = 'testPdfs/TestPage.pdf'
-        elif mode == 'shaded':
-            file_to_print = 'testPdfs/ShadedTestPage.pdf'
-
-        # Establish connection to CUPS and get available printers
-        conn = cups.Connection()
-        printers = conn.getPrinters()
-
-        if len(printers) == 0:
-            return jsonify({'error': 'No printers found'}), 500
-
-        # Select the first available printer
-        selected_printer = list(printers.keys())[0]
-
-        # Define the print options (we're not changing options here)
-        options = {
-            'media': 'A4'
-        }
-
-        # Send the file to the printer
-        job_info = conn.printFile(selected_printer, file_to_print, "Test Print", options)
-
-        # Wait for the job to complete (CUPS job state 9 = "completed")
-        while conn.getJobAttributes(job_info)["job-state"] != 9:
-            print("Processing job")
-            time.sleep(1)
-
-        return jsonify({'status': 'Print job completed'}), 200
+def test():
     
-    except Exception as e:
-        return jsonify({'error': 'An unexpected error occurred', 'details': str(e)}), 500
+    # Get the query parameter (either "normal" or "shaded")
+    mode = request.args.get('mode')
+
+    message, status_code = perform_test_print(mode)
+
+    return jsonify({'message': message}), status_code
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
