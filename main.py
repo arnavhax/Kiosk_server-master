@@ -2,19 +2,15 @@ from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import cups
 import requests
-import os
-import base64
-from PyPDF2 import PdfWriter, PdfReader
-import io
-import time
 import json
 import secrets
 from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
-from tools.deduct_pages import deduct_pages
-import math
 from tools.get_mac_address import get_mac_address
+from flask import Response, request, jsonify
+from tools.printer_utils import process_print_job
+
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -38,7 +34,7 @@ def get_kiosk_credentials():
 
 @app.route('/resetPages', methods=['POST'])
 def reset_pages():
-    reset_value = request.args.get('pages')
+    reset_value = request.json.get('pages')
     if (not (reset_value == 200 or reset_value == 500 or reset_value == 700)):
         return jsonify({'message': 'Invalid reset value'}), 400
     try:
@@ -67,7 +63,7 @@ def get_pages():
         return jsonify({'message': f'Some error occured \n {e}'}), 400  
 
 
-@app.route('/printNew', methods=['POST', 'GET'])
+@app.route('/print', methods=['POST', 'GET'])
 def print_route_new():
     if request.method == 'POST':
         try:
@@ -99,73 +95,12 @@ def print_route_new():
                 
                 files = jobs[0]
                 jobs = []  # Process the first and only job
-                print("jobs after popping" ,jobs)
                 save_jobs(jobs)  # Save the updated jobs list after removing the processed job
+
+                # Call the function from printer_utils
+                result = process_print_job(files)
                 
-                for file in files:
-                    blob_data = file['blob']
-                    double_page = file['selectedOption']
-                    copies = file['numCopies']
-                    selected_pages = file['selectedPages']
-
-
-                    ## DEDUCTING PAGES HERE 
-                    print("PRINTING ")
-    
-                    if double_page == 'double':
-                        job_pages = math.ceil(int(len(selected_pages))/2)
-                    else:
-                        job_pages = int(len(selected_pages))
-                    total_pages = job_pages*int(copies)
-                    print("TOTAL PAGES", total_pages)
-                    code = deduct_pages(total_pages)
-                    
-                    if (code != 200):
-                        raise Exception("Deduct pages failed")
-                    
-                    print("Options", double_page, copies, selected_pages)
-                    pdf_file = base64.b64decode(blob_data)
-                    pdf_reader = PdfReader(io.BytesIO(pdf_file))
-                    
-                    output = PdfWriter()
-                    for page_number in range(len(pdf_reader.pages)):
-                        if page_number + 1 in selected_pages:
-                            output.add_page(pdf_reader.pages[page_number])
-                    
-                    output_stream = io.BytesIO()
-                    output.write(output_stream)
-                    output_stream.seek(0)
-                    pdf_binary_data = output_stream.getvalue()
-                    
-                    temp = "temp.pdf"
-                    with open(temp, 'wb') as f:
-                        f.write(pdf_binary_data)
-                    
-                    if temp and temp.endswith('.pdf'):
-                        conn = cups.Connection()
-                        printers = conn.getPrinters()
-                        if len(printers) == 0:
-                            raise Exception("No printers found")
-                        selected_printer = list(printers.keys())[0]  # Assuming the first printer in the list
-                        
-                        options = {
-                            'multiple-document-handling': 'separate-documents-collated-copies' if copies > 1 else 'single_document',
-                            'sides': 'two-sided-long-edge' if double_page == 'double' else 'one-sided',
-                            'copies': str(copies)
-                        }
-                        print(options)
-                        
-                        job_info = conn.printFile(selected_printer, temp, "", options)
-                        
-                        while conn.getJobAttributes(job_info)["job-state"] != 9:
-                            print("Processing job")
-                            time.sleep(1)  # optimise this , find a way to make this more stable
-                        
-                        yield f"data: {json.dumps({'Current Job': file['name'], 'completed': 'no'})}\n\n"
-                        
-                        os.remove(temp)
-            
-                yield f"data: {json.dumps({'completed': 'yes'})}\n\n"
+                yield f"data: {json.dumps(result)}\n\n"
             
             except Exception as e:
                 yield f"data: {{'error': 'An unexpected error occurred', 'details': '{str(e)}'}}\n\n"
