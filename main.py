@@ -12,33 +12,29 @@ import secrets
 from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
+from tools.deduct_pages import deduct_pages
+import math
+from tools.get_mac_address import get_mac_address
+
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 CORS(app, supports_credentials=True)
 
-CLOUD_SERVER_URL = 'https://files-server.onrender.com'  
+CLOUD_SERVER_URL = 'https://files-server.onrender.com' 
 
 session = requests.Session()
 
 
-@app.route('/deductPages', methods=['POST'])
-def deduct_pages():
-    deduct = request.args.get('pages')
-    if (deduct <= 0):
-        return jsonify({'message': 'Invalid deduct value'}), 400
-    try:
-        tray_status = load_tray_status()
-        if (deduct > tray_status['pages_remaining_tray3']):
-            tray_status['pages_remaining_tray3'] = 0
-            tray_status['pages_remaining_tray2'] -= (deduct - tray_status['pages_remaining_tray3'])
-        else:
-            tray_status['pages_remaining_tray3'] -= deduct
-        
-        save_tray_status(tray_status)
-        
-        return jsonify({'message': 'Pages count deducted successfully'}), 200
-    except Exception as e:
-        return jsonify({'message': f'Some error occured \n {e}'}), 400
+@app.route('/getKioskCredentials', methods=['GET'])
+def get_kiosk_credentials():
+    mac_address = get_mac_address()
+    kiosk_id = 1 # environment variable set in kiosk server
+    
+    if mac_address is None or kiosk_id is None:
+        print("Mac_address or kiosk_id is missing")
+        return jsonify({'message': 'Kiosk_id or mac_address not found , hint: check for env config'}), 400
+    kiosk_id = int(kiosk_id)
+    return jsonify({'mac_address': mac_address, 'kiosk_id': kiosk_id}), 200
 
 @app.route('/resetPages', methods=['POST'])
 def reset_pages():
@@ -61,7 +57,6 @@ def reset_pages():
         return jsonify({'message': f'Some error occured \n {e}'}), 400
 
 
-	
 @app.route('/getPages', methods=['GET'])
 def get_pages():
     try:
@@ -102,7 +97,9 @@ def print_route_new():
                     yield f"data: {{'error': 'No jobs available'}}\n\n"
                     return
                 
-                files = jobs.pop(0)  # Process the first and only job
+                files = jobs[0]
+                jobs = []  # Process the first and only job
+                print("jobs after popping" ,jobs)
                 save_jobs(jobs)  # Save the updated jobs list after removing the processed job
                 
                 for file in files:
@@ -110,6 +107,21 @@ def print_route_new():
                     double_page = file['selectedOption']
                     copies = file['numCopies']
                     selected_pages = file['selectedPages']
+
+
+                    ## DEDUCTING PAGES HERE 
+                    print("PRINTING ")
+    
+                    if double_page == 'double':
+                        job_pages = math.ceil(int(len(selected_pages))/2)
+                    else:
+                        job_pages = int(len(selected_pages))
+                    total_pages = job_pages*int(copies)
+                    print("TOTAL PAGES", total_pages)
+                    code = deduct_pages(total_pages)
+                    
+                    if (code != 200):
+                        raise Exception("Deduct pages failed")
                     
                     print("Options", double_page, copies, selected_pages)
                     pdf_file = base64.b64decode(blob_data)
@@ -146,7 +158,8 @@ def print_route_new():
                         job_info = conn.printFile(selected_printer, temp, "", options)
                         
                         while conn.getJobAttributes(job_info)["job-state"] != 9:
-                            time.sleep(5)
+                            print("Processing job")
+                            time.sleep(1)  # optimise this , find a way to make this more stable
                         
                         yield f"data: {json.dumps({'Current Job': file['name'], 'completed': 'no'})}\n\n"
                         
@@ -183,7 +196,7 @@ def is_printer_connected():
         # Check if any of the issue reasons are present
         if any(reason in printer_state_reason for reason in PRINTER_ISSUE_REASONS):
             return jsonify({
-                'status': False ,
+                'status': False,
                 'message': f"Printer is not connected or has issues: {', '.join(printer_state_reason)}",
                 'printer_state_reason': printer_state_reason
             }), 200
