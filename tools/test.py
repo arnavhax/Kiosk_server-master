@@ -29,15 +29,18 @@ def perform_test_print(mode):
 
         # Send the file to the printer
         job_info = conn.printFile(selected_printer, file_to_print, "Test Print", options)
-
+        job_error = [6, 7, 8]
         # Wait for the job to complete (CUPS job state 9 = "completed")
         while conn.getJobAttributes(job_info)["job-state"] != 9:
-            if (conn.getJobAttributes(job_info)["job-state"] == 6 or conn.getJobAttributes(job_info)["job-state"] == 7 or conn.getJobAttributes(job_info)["job-state"] == 8):
+            if (conn.getJobAttributes(job_info)["job-state"] in job_error):
+                print("error is", conn.getJobAttributes(job_info))
                 raise Exception("Print file failed", "Printer Error code = ", conn.getJobAttributes(job_info)["job-state"])
             print("Processing job")
+            print("job status", conn.getJobAttributes(job_info))
             time.sleep(1)
 
         return 'Print job completed', 200
 
     except Exception as e:
+        print("error is", str(e))
         return f'An unexpected error occurred: {str(e)}', 500

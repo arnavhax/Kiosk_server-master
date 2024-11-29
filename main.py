@@ -8,7 +8,7 @@ from tools.tray_status import load_tray_status, save_tray_status
 from tools.jobs_handler import load_jobs, save_jobs
 from tools.reasons import PRINTER_ISSUE_REASONS
 from tools.get_mac_address import get_mac_address
-from tools.printer_utils import process_print_job
+from tools.printer_utils import process_print_job, ExceptionWithCode
 from tools.test import perform_test_print
 
 app = Flask(__name__)
@@ -104,8 +104,12 @@ def print_route_new():
                 
                 yield f"data: {json.dumps(result)}\n\n"
             
+            except ExceptionWithCode as e:
+                yield f"data: {json.dumps({'error': 'An issue occurred during printing', 'details': e.to_dict()})}\n\n"
+            
             except Exception as e:
-                yield f"data: {{'error': 'An unexpected error occurred', 'details': '{str(e)}'}}\n\n"
+                # Handle general exceptions
+                yield f"data: {json.dumps({'error': 'An unexpected error occurred', 'details': {'message': str(e)}})}\n\n"
         
         return Response(generate_events(), content_type='text/event-stream')
 
