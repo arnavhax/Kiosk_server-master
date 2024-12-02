@@ -214,6 +214,48 @@ def test():
 
     return jsonify({'message': message}), status_code
 
+@app.route('/getCartridgeLevel', methods=['GET'])
+def get_cartridge_level():
+    try:
+        # Establish a connection to the CUPS server
+        conn = cups.Connection()
+
+        # Fetch the list of available printers
+        printers = conn.getPrinters()
+
+        if not printers:
+            return jsonify({'status': 'error', 'message': 'No printers found.'}), 404
+
+        # Assuming we are checking the first printer
+        printer_name = list(printers.keys())[0]
+
+        # Fetch printer attributes
+        printer_attributes = conn.getPrinterAttributes(printer_name)
+
+        # Fetch cartridge level details (Assuming 'marker-levels' is used; this depends on the printer model)
+        cartridge_levels = printer_attributes.get('marker-levels', None)
+        if cartridge_levels is None:
+            return jsonify({
+                'status': 'error',
+                'message': 'Cartridge level information not available for this printer.'
+            }), 404
+
+        # Return cartridge level details
+        return jsonify({
+            'status': 'success',
+            'printer_name': printer_name,
+            'cartridge_levels': cartridge_levels
+        }), 200
+
+    except cups.IPPError as e:
+        # Handle specific CUPS errors
+        return jsonify({'status': 'error', 'message': f'IPP Error: {str(e)}'}), 500
+    except Exception as e:
+        # General error handling
+        return jsonify({'status': 'error', 'message': f'An unexpected error occurred: {str(e)}'}), 500
+
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
     
